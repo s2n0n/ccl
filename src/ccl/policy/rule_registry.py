@@ -28,6 +28,7 @@ LAW_ID_TO_RELATIVE_PATH: dict[str, str] = {
     "kr-credit": "kr/credit-information-use-act.md",
     "kr-network": "kr/network-utilization-act.md",
     "eu-ai-act": "eu/ai-act.md",
+    "iso27001":  "iso/iso27001.md",
 }
 
 
