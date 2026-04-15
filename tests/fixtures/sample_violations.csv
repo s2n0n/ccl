@@ -1,0 +1,6 @@
+user_id,email,phone,jumin_number,health_status,credit_score
+1,alice@example.com,010-1234-5678,850101-1234567,당뇨병,720
+2,bob@company.org,010-9876-5432,920315-2345678,고혈압,680
+3,carol@mail.net,+821055556666,780622-1987654,건강함,750
+4,dave@test.com,02-333-4444,650910-2111111,비만,810
+5,eve@example.com,010-7777-8888,991231-4567890,정상,690

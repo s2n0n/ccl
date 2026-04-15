@@ -1,0 +1,6 @@
+user_id,username,product_id,purchase_date,amount
+1,alice,P001,2024-01-15,29.99
+2,bob,P002,2024-01-16,49.99
+3,carol,P003,2024-01-17,19.99
+4,dave,P004,2024-01-18,99.99
+5,eve,P005,2024-01-19,14.99

@@ -1,0 +1,14 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+.pytest_cache
+.ruff_cache
+tests/
+docs/
+*.md
+!laws/**/*.md
+requirements-dev.txt
