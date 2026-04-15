@@ -31,8 +31,12 @@ class LawParser:
     def parse(self, path: str) -> list[Rule]:
         """Parse a .md law file and return a list of Rule objects."""
         text = Path(path).read_text(encoding="utf-8")
+        return self.parse_text(text, law_id=Path(path).stem)
+
+    def parse_text(self, text: str, law_id: str) -> list[Rule]:
+        """Parse law bundle text and return a list of Rule objects."""
         post = frontmatter.loads(text)
-        law_id = post.metadata.get("law_id", Path(path).stem)
+        actual_law_id = post.metadata.get("law_id", law_id)
 
         rules = []
         for m in _RULE_BLOCK_RE.finditer(post.content):
@@ -47,7 +51,7 @@ class LawParser:
 
             rules.append(Rule(
                 rule_id=m.group("rule_id").strip(),
-                law_id=law_id,
+                law_id=actual_law_id,
                 severity=severity,
                 article=(m.group("article") or "").strip(),
                 description=(m.group("description") or "").strip(),

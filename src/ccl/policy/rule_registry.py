@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from functools import lru_cache
+
+import frontmatter
 
 from ccl.models import Rule
 from ccl.policy.law_parser import LawParser
@@ -35,13 +36,14 @@ LAW_ID_TO_RELATIVE_PATH: dict[str, str] = {
 class RuleRegistry:
     def __init__(self) -> None:
         self._parser = LawParser()
-        self._cache: dict[str, list[Rule]] = {}
+        self._cache: dict[str, tuple[dict, list[Rule]]] = {}
 
     def get_rules(self, law_id: str) -> list[Rule]:
-        law_id = law_id.lower()
-        if law_id not in self._cache:
-            self._cache[law_id] = self._load(law_id)
-        return self._cache[law_id]
+        return self._get_cached(law_id.lower())[1]
+
+    def get_law_metadata(self, law_id: str) -> dict:
+        """Return frontmatter metadata from the law file."""
+        return self._get_cached(law_id.lower())[0]
 
     def get_law_path(self, law_id: str) -> Path:
         law_id = law_id.lower()
@@ -56,16 +58,17 @@ class RuleRegistry:
             raise FileNotFoundError(f"Law bundle file not found: {path}")
         return path
 
-    def get_law_metadata(self, law_id: str) -> dict:
-        """Return frontmatter metadata from the law file."""
-        import frontmatter
-        path = self.get_law_path(law_id)
-        post = frontmatter.load(str(path))
-        return dict(post.metadata)
+    def _get_cached(self, law_id: str) -> tuple[dict, list[Rule]]:
+        if law_id not in self._cache:
+            self._cache[law_id] = self._load(law_id)
+        return self._cache[law_id]
 
-    def _load(self, law_id: str) -> list[Rule]:
+    def _load(self, law_id: str) -> tuple[dict, list[Rule]]:
         path = self.get_law_path(law_id)
-        rules = self._parser.parse(str(path))
+        text = path.read_text(encoding="utf-8")
+        post = frontmatter.loads(text)
+        metadata = dict(post.metadata)
+        rules = self._parser.parse_text(text, law_id=path.stem)
         if not rules:
             raise ValueError(f"No rules found in law bundle: {path}")
-        return rules
+        return metadata, rules

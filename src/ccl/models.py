@@ -114,6 +114,13 @@ class LLMMeta(BaseModel):
 
 # ── Report ────────────────────────────────────────────────────────────────────
 
+_EXIT_CODES: dict[ReportStatus, int] = {
+    ReportStatus.PASS: 0,
+    ReportStatus.FAIL: 1,
+    ReportStatus.UNKNOWN: 2,
+}
+
+
 class ComplianceReport(BaseModel):
     dataset_id: str
     law_bundle_version: str
@@ -128,10 +135,4 @@ class ComplianceReport(BaseModel):
 
     def to_exit_code(self) -> int:
         # 종료 코드는 규칙 엔진 결과(status) 기준. LLM 결과는 미영향.
-        if self.status == ReportStatus.PASS:
-            return 0
-        if self.status == ReportStatus.FAIL:
-            return 1
-        if self.status == ReportStatus.UNKNOWN:
-            return 2
-        return 3
+        return _EXIT_CODES[self.status]

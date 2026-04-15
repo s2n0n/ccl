@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
-import random
 from pathlib import Path
 
+import pandas as pd
 import pyarrow.parquet as pq
 
 from ccl.models import ColumnSchema, SampleSchema
@@ -23,7 +23,6 @@ class ParquetExtractor:
             df = rg.to_pandas().astype(str)
             frames.append(df.head(rows_per_group))
 
-        import pandas as pd
         df = pd.concat(frames, ignore_index=True).head(sample_rows) if frames else pd.DataFrame()
 
         dataset_id = Path(path).stem

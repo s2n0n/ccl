@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
 from ccl.models import (
     ColumnCategory,
@@ -24,12 +23,10 @@ from ccl.models import (
 #   consent_missing()
 # ─────────────────────────────────────────────────────────────────────────────
 
-_PREDICATES = {
-    "pii_present",
-    "any_column",
-    "retention_exceeded",
-    "purpose_unspecified",
-    "consent_missing",
+_ACTION_TO_STATUS: dict[RuleAction, ViolationStatus] = {
+    RuleAction.FAIL:    ViolationStatus.FAIL,
+    RuleAction.PASS:    ViolationStatus.PASS,
+    RuleAction.UNKNOWN: ViolationStatus.UNKNOWN,
 }
 
 _ANY_COLUMN_RE = re.compile(
@@ -67,7 +64,7 @@ class RuleEvaluator:
                     column=affected_column,
                 ))
             elif result is True:
-                status = ViolationStatus(rule.action.value)
+                status = _ACTION_TO_STATUS[rule.action]
                 violations.append(Violation(
                     rule_id=rule.rule_id,
                     article=rule.article,

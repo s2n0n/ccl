@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -61,14 +60,14 @@ def main() -> None:
 def validate(
     input_path: str,
     law_ids: tuple[str, ...],
-    metadata_path: Optional[str],
-    output_path: Optional[str],
-    audit_log_path: Optional[str],
+    metadata_path: str | None,
+    output_path: str | None,
+    audit_log_path: str | None,
     fail_on_violation: bool,
     sample_rows: int,
-    llm_provider: Optional[str],
-    llm_model: Optional[str],
-    llm_endpoint: Optional[str],
+    llm_provider: str | None,
+    llm_model: str | None,
+    llm_endpoint: str | None,
     llm_mode: str,
     llm_max_samples: int,
     llm_timeout: int,
@@ -95,14 +94,14 @@ def validate(
 def _run_validate(
     input_path: str,
     law_ids: list[str],
-    metadata_path: Optional[str],
-    output_path: Optional[str],
-    audit_log_path: Optional[str],
+    metadata_path: str | None,
+    output_path: str | None,
+    audit_log_path: str | None,
     fail_on_violation: bool,
     sample_rows: int,
-    llm_provider: Optional[str] = None,
-    llm_model: Optional[str] = None,
-    llm_endpoint: Optional[str] = None,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    llm_endpoint: str | None = None,
     llm_mode: str = "enrich",
     llm_max_samples: int = 5,
     llm_timeout: int = 30,
@@ -195,12 +194,15 @@ def _run_llm_augment(report, schema, provider, model, endpoint, mode, max_sample
         return report
 
 
+_DEFAULT_MODELS: dict[str, str] = {
+    "ollama": "llama3.2",
+    "claude": "claude-sonnet-4-6",
+    "openai": "gpt-4o-mini",
+}
+
+
 def _default_model(provider: str) -> str:
-    return {
-        "ollama": "llama3.2",
-        "claude": "claude-sonnet-4-6",
-        "openai": "gpt-4o-mini",
-    }.get(provider.lower(), "")
+    return _DEFAULT_MODELS.get(provider.lower(), "")
 
 
 def _apply_metadata(schema, metadata_path: str):

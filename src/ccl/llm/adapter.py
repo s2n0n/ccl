@@ -1,8 +1,10 @@
 """LLM adapter base class and factory."""
 from __future__ import annotations
 
+import os
 import time
-from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 
 @dataclass
@@ -12,17 +14,32 @@ class LLMResponse:
     latency_ms: int = 0
 
 
-class LLMAdapter:
+class LLMAdapter(ABC):
     """Base class for LLM adapters. Subclasses implement complete()."""
 
-    def complete(self, prompt: str) -> LLMResponse:  # pragma: no cover
-        raise NotImplementedError
+    @abstractmethod
+    def complete(self, prompt: str) -> LLMResponse: ...
 
-    def health_check(self) -> bool:  # pragma: no cover
-        raise NotImplementedError
+    @abstractmethod
+    def health_check(self) -> bool: ...
 
-    def metadata(self) -> dict:  # pragma: no cover
-        raise NotImplementedError
+    @abstractmethod
+    def metadata(self) -> dict: ...
+
+
+class HttpLLMAdapter(LLMAdapter):
+    """API 키 기반 HTTP LLM 어댑터의 공통 초기화 및 health_check."""
+
+    def __init__(self, model: str, timeout: int, env_var: str, error_msg: str) -> None:
+        self.model = model
+        self._timeout = timeout
+        api_key = os.environ.get(env_var, "")
+        if not api_key:
+            raise RuntimeError(error_msg)
+        self._api_key = api_key
+
+    def health_check(self) -> bool:
+        return bool(self._api_key)
 
 
 def create_adapter(

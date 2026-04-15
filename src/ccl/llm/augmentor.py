@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import re
 
-from ccl.llm.adapter import LLMAdapter, LLMResponse
+from ccl.llm.adapter import LLMAdapter
 from ccl.llm.prompts import (
     build_enrich_prompt,
     build_quasi_id_prompt,
@@ -68,20 +68,30 @@ class LLMAugmentor:
         # ── enrich: FAIL 항목에 설명 추가 ─────────────────────────────────────
         if self._mode in ("enrich", "full"):
             violations, t, l, e = self._enrich_fails(violations, schema)
-            tokens_total += t; latency_total += l; errors += e
+            tokens_total += t
+            latency_total += l
+            errors += e
 
         # ── resolve: UNKNOWN 항목 재평가 ──────────────────────────────────────
         if self._mode in ("resolve", "full"):
             violations, t, l, e = self._resolve_unknowns(violations, schema)
-            tokens_total += t; latency_total += l; errors += e
+            tokens_total += t
+            latency_total += l
+            errors += e
 
         # ── full: 비정형 PII + 준식별자 분석 ─────────────────────────────────
         if self._mode == "full":
             findings, t, l, e = self._scan_unstructured(schema)
-            llm_findings += findings; tokens_total += t; latency_total += l; errors += e
+            llm_findings += findings
+            tokens_total += t
+            latency_total += l
+            errors += e
 
             findings, t, l, e = self._analyze_quasi_id(schema)
-            llm_findings += findings; tokens_total += t; latency_total += l; errors += e
+            llm_findings += findings
+            tokens_total += t
+            latency_total += l
+            errors += e
 
         # LLM_PASS 판정 위반은 리포트에서 제거 (audit을 위해 llm_meta에 기록)
         llm_pass_count = sum(1 for v in violations if v.status == ViolationStatus.LLM_PASS)

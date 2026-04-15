@@ -16,6 +16,27 @@ def _trim_samples(values: list[str], n: int) -> list[str]:
     return [str(v)[:_MAX_VALUE_LEN] for v in values[:n]]
 
 
+def _format_schema(schema: SampleSchema, max_samples: int, *, include_protection: bool = False) -> str:
+    """스키마의 모든 컬럼을 텍스트로 포맷한다.
+
+    include_protection=True 이면 masked/encrypted 필드 포함.
+    """
+    col_lines = []
+    for col in schema.columns:
+        samples = _trim_samples(col.sample_values, max_samples)
+        if include_protection:
+            col_lines.append(
+                f"  - {col.name}: category={col.category.value}, "
+                f"masked={col.masked}, encrypted={col.encrypted}, "
+                f"samples={samples}"
+            )
+        else:
+            col_lines.append(
+                f"  - {col.name}: category={col.category.value}, samples={samples}"
+            )
+    return "\n".join(col_lines) or "  (no columns)"
+
+
 def build_enrich_prompt(
     violation: Violation,
     schema: SampleSchema,
@@ -45,16 +66,7 @@ def build_resolve_prompt(
     max_samples: int,
 ) -> str:
     """UNKNOWN 위반 항목 재평가용 프롬프트."""
-    col_lines = []
-    for col in schema.columns:
-        samples = _trim_samples(col.sample_values, max_samples)
-        col_lines.append(
-            f"  - {col.name}: category={col.category.value}, "
-            f"masked={col.masked}, encrypted={col.encrypted}, "
-            f"samples={samples}"
-        )
-    schema_text = "\n".join(col_lines) or "  (no columns)"
-
+    schema_text = _format_schema(schema, max_samples, include_protection=True)
     return (
         f"{_SYSTEM}\n\n"
         f"Law article: {violation.article}\n"
@@ -81,14 +93,7 @@ def build_unstructured_pii_prompt(col: ColumnSchema, max_samples: int) -> str:
 
 def build_quasi_id_prompt(schema: SampleSchema, max_samples: int) -> str:
     """전체 컬럼 조합의 준식별자 위험도 분석용 프롬프트."""
-    col_lines = []
-    for col in schema.columns:
-        samples = _trim_samples(col.sample_values, max_samples)
-        col_lines.append(
-            f"  - {col.name}: category={col.category.value}, samples={samples}"
-        )
-    schema_text = "\n".join(col_lines) or "  (no columns)"
-
+    schema_text = _format_schema(schema, max_samples, include_protection=False)
     return (
         f"{_SYSTEM}\n\n"
         f"Dataset columns:\n{schema_text}\n\n"

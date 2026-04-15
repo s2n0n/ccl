@@ -5,7 +5,6 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import TextIO
 
 from ccl import __version__
 from ccl.models import ComplianceReport
