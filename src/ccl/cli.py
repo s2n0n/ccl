@@ -35,6 +35,29 @@ def main() -> None:
               help="Exit 1 on any FAIL (for CI/CD pipelines).")
 @click.option("--sample-rows", default=500, show_default=True, type=int,
               help="Number of rows to sample for PII scanning.")
+# ── LLM 옵션 ──────────────────────────────────────────────────────────────────
+@click.option("--llm-provider",
+              type=click.Choice(["ollama", "claude", "openai"], case_sensitive=False),
+              default=None,
+              help="LLM provider for augmented analysis. Omit to disable LLM features.")
+@click.option("--llm-model", default=None,
+              help="Model name (e.g. llama3.2, claude-sonnet-4-6, gpt-4o). "
+                   "Defaults: ollama=llama3.2, claude=claude-sonnet-4-6, openai=gpt-4o-mini.")
+@click.option("--llm-endpoint", default=None,
+              help="Ollama server URL (default: http://localhost:11434). Ignored for cloud providers.")
+@click.option("--llm-mode",
+              type=click.Choice(["enrich", "resolve", "full"], case_sensitive=False),
+              default="enrich", show_default=True,
+              help=(
+                  "LLM augmentation mode: "
+                  "enrich=add Korean explanations to FAIL violations, "
+                  "resolve=re-evaluate UNKNOWN violations, "
+                  "full=enrich+resolve+unstructured PII+quasi-identifier analysis."
+              ))
+@click.option("--llm-max-samples", default=5, show_default=True, type=int,
+              help="Max sample values sent to LLM per column (data minimisation).")
+@click.option("--llm-timeout", default=30, show_default=True, type=int,
+              help="LLM API call timeout in seconds.")
 def validate(
     input_path: str,
     law_ids: tuple[str, ...],
@@ -43,6 +66,12 @@ def validate(
     audit_log_path: Optional[str],
     fail_on_violation: bool,
     sample_rows: int,
+    llm_provider: Optional[str],
+    llm_model: Optional[str],
+    llm_endpoint: Optional[str],
+    llm_mode: str,
+    llm_max_samples: int,
+    llm_timeout: int,
 ) -> None:
     """Validate a dataset for compliance against one or more laws."""
     exit_code = _run_validate(
@@ -53,6 +82,12 @@ def validate(
         audit_log_path=audit_log_path,
         fail_on_violation=fail_on_violation,
         sample_rows=sample_rows,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_endpoint=llm_endpoint,
+        llm_mode=llm_mode,
+        llm_max_samples=llm_max_samples,
+        llm_timeout=llm_timeout,
     )
     sys.exit(exit_code)
 
@@ -65,6 +100,12 @@ def _run_validate(
     audit_log_path: Optional[str],
     fail_on_violation: bool,
     sample_rows: int,
+    llm_provider: Optional[str] = None,
+    llm_model: Optional[str] = None,
+    llm_endpoint: Optional[str] = None,
+    llm_mode: str = "enrich",
+    llm_max_samples: int = 5,
+    llm_timeout: int = 30,
 ) -> int:
     try:
         from ccl.extractor.base import get_extractor
@@ -99,26 +140,67 @@ def _run_validate(
             violations = evaluator.evaluate(schema, rules)
             all_violations.extend(violations)
 
-        # 5. Build report
+        # 5. Build report (규칙 엔진 결과 확정 — status/summary/exit_code 기준값)
         builder = ReportBuilder()
         report = builder.build(schema, all_violations, law_ids, law_versions)
 
-        # 6. Output report
+        # 6. LLM 보강 (--llm-provider 미지정 시 스킵)
+        if llm_provider:
+            report = _run_llm_augment(
+                report=report,
+                schema=schema,
+                provider=llm_provider,
+                model=llm_model or _default_model(llm_provider),
+                endpoint=llm_endpoint,
+                mode=llm_mode,
+                max_samples=llm_max_samples,
+                timeout=llm_timeout,
+            )
+
+        # 7. Output report
         report_json = report.model_dump_json(indent=2)
         if output_path:
             Path(output_path).write_text(report_json, encoding="utf-8")
         else:
             click.echo(report_json)
 
-        # 7. Audit log
+        # 8. Audit log
         AuditLogger(audit_log_path).log(report)
 
-        # 8. Exit code
+        # 9. Exit code (규칙 엔진 status 기준 — LLM 결과 미영향)
         return report.to_exit_code()
 
     except Exception as e:
         click.echo(f"ERROR: {e}", err=True)
         return 3
+
+
+def _run_llm_augment(report, schema, provider, model, endpoint, mode, max_samples, timeout):
+    """LLM 어댑터를 생성하고 보강을 실행한다. 실패 시 원본 report 반환."""
+    try:
+        from ccl.llm.adapter import create_adapter
+        from ccl.llm.augmentor import LLMAugmentor
+
+        if provider != "ollama":
+            click.echo(
+                f"[LLM] {provider.upper()} API 연결 중 (--network none 옵션 사용 불가).",
+                err=True,
+            )
+
+        adapter = create_adapter(provider, model, endpoint, timeout)
+        augmentor = LLMAugmentor(adapter, mode=mode, max_samples=max_samples)
+        return augmentor.augment(report, schema)
+    except Exception as exc:
+        click.echo(f"[LLM] 보강 실패, 규칙 엔진 결과만 반환합니다: {exc}", err=True)
+        return report
+
+
+def _default_model(provider: str) -> str:
+    return {
+        "ollama": "llama3.2",
+        "claude": "claude-sonnet-4-6",
+        "openai": "gpt-4o-mini",
+    }.get(provider.lower(), "")
 
 
 def _apply_metadata(schema, metadata_path: str):

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -59,6 +58,8 @@ class ViolationStatus(str, Enum):
     FAIL = "FAIL"
     UNKNOWN = "UNKNOWN"
     PASS = "PASS"
+    LLM_FAIL = "LLM_FAIL"   # LLM이 UNKNOWN을 FAIL로 판정
+    LLM_PASS = "LLM_PASS"   # LLM이 UNKNOWN을 PASS로 판정
 
 
 class Violation(BaseModel):
@@ -69,6 +70,7 @@ class Violation(BaseModel):
     status: ViolationStatus
     column: str | None = None
     sample_count: int | None = None
+    llm_explanation: str | None = None   # enrich/resolve/full 모드 시 추가
 
 
 class ReportStatus(str, Enum):
@@ -84,6 +86,34 @@ class ReportSummary(BaseModel):
     unknown: int
 
 
+# ── LLM 연동 모델 ─────────────────────────────────────────────────────────────
+
+class LLMFindingType(str, Enum):
+    UNSTRUCTURED_PII = "UNSTRUCTURED_PII"   # 비정형 텍스트 내 PII
+    QUASI_IDENTIFIER = "QUASI_IDENTIFIER"   # 준식별자 조합
+
+
+class LLMFinding(BaseModel):
+    finding_type: LLMFindingType
+    column: str | None = None
+    columns: list[str] = Field(default_factory=list)
+    rationale: str
+    severity: Severity
+    source: str   # "llm:ollama/llama3.2"
+
+
+class LLMMeta(BaseModel):
+    provider: str
+    model: str
+    endpoint: str | None = None
+    mode: str
+    tokens_used: int = 0
+    latency_ms: int = 0
+    errors: list[str] = Field(default_factory=list)
+
+
+# ── Report ────────────────────────────────────────────────────────────────────
+
 class ComplianceReport(BaseModel):
     dataset_id: str
     law_bundle_version: str
@@ -93,8 +123,11 @@ class ComplianceReport(BaseModel):
     summary: ReportSummary
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     engine_version: str = "2.0.0"
+    llm_findings: list[LLMFinding] = Field(default_factory=list)
+    llm_meta: LLMMeta | None = None
 
     def to_exit_code(self) -> int:
+        # 종료 코드는 규칙 엔진 결과(status) 기준. LLM 결과는 미영향.
         if self.status == ReportStatus.PASS:
             return 0
         if self.status == ReportStatus.FAIL:
