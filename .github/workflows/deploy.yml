@@ -36,7 +36,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: opens2n/ccl
           tags: |
             type=raw,value=latest
             type=sha,prefix=sha-,format=short
